@@ -1,5 +1,11 @@
 package com.example.weathery.alarm
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.net.Uri
+import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,19 +21,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
-import com.airbnb.lottie.compose.LottieAnimation
-import com.airbnb.lottie.compose.LottieCompositionSpec
-import com.airbnb.lottie.compose.LottieConstants
-import com.airbnb.lottie.compose.animateLottieCompositionAsState
-import com.airbnb.lottie.compose.rememberLottieComposition
+import com.airbnb.lottie.compose.*
 import com.example.weathery.R
 import com.example.weathery.data.local.WeatherAlarmEntity
 import com.example.weathery.data.models.UiState
-import com.example.weathery.favourite.WeatherLottieBackground
 import kotlinx.coroutines.launch
 import java.util.*
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,6 +44,26 @@ fun AlarmScreen(
     val scope = rememberCoroutineScope()
     var deletedAlarm by remember { mutableStateOf<WeatherAlarmEntity?>(null) }
     val context = LocalContext.current
+
+    var showOverlayPermissionDialog by remember { mutableStateOf(false) }
+
+    // Listen to alarm broadcasts (previously used for AlarmBanner)
+    DisposableEffect(Unit) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                // Previously used for AlarmBanner
+            }
+        }
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            IntentFilter("com.example.weathery.ALARM_TRIGGERED"),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        onDispose {
+            context.unregisterReceiver(receiver)
+        }
+    }
 
     LaunchedEffect(deletedAlarm) {
         deletedAlarm?.let { alarm ->
@@ -57,11 +80,41 @@ fun AlarmScreen(
         }
     }
 
+    if (showOverlayPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showOverlayPermissionDialog = false },
+            title = { Text("Overlay Permission Required") },
+            text = { Text("To display alarms over other apps, please allow overlay permission in settings.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showOverlayPermissionDialog = false
+                    val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + context.packageName)).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(intent)
+                }) {
+                    Text("Go to Settings")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showOverlayPermissionDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { navController.navigate("addAlarm") },
+                onClick = {
+                    if (!Settings.canDrawOverlays(context)) {
+                        showOverlayPermissionDialog = true
+                    } else {
+                        navController.navigate("addAlarm")
+                    }
+                },
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Alarm")
@@ -83,7 +136,7 @@ fun AlarmScreen(
 
             AlarmLottieBackground(condition = bgCondition)
 
-            // 🌫 Overlay color
+            // Overlay effect
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -97,41 +150,7 @@ fun AlarmScreen(
 
             Column(modifier = Modifier.padding(16.dp)) {
 
-                Button(onClick = {
-                    scope.launch {
-                        val triggerTime = System.currentTimeMillis() + 10_000L // 10 seconds
-
-                        // 1. Create a fake alarm entity
-                        val testAlarm = WeatherAlarmEntity(
-                            id = 0, // ID will be auto-generated
-                            cityName = "Test City",
-                            lat = 0.0,
-                            lon = 0.0,
-                            startTime = triggerTime,
-                            endTime = triggerTime + 60_000,
-                            conditionType = "",
-                            condition = "",
-                            thresholdValue = null,
-                            triggerType = "notification" // or "alarm"
-                        )
-
-                        // 2. Save to Room and get the new ID
-                        val alarmId = viewModel.saveAndReturnId(testAlarm)
-
-                        // 3. Schedule the alarm
-                        viewModel.scheduleAlarm(
-                            context = context,
-                            alarmTime = triggerTime,
-                            requestCode = alarmId,
-                            alarmId = alarmId
-                        )
-
-                        Toast.makeText(context, "Test alarm saved & scheduled in 10s", Toast.LENGTH_SHORT).show()
-                    }
-                }) {
-                    Text("🔔 Test Alarm Now")
-                }
-
+                // Alarm List
                 when (state) {
                     is UiState.Loading -> CircularProgressIndicator()
                     is UiState.Error -> Text("Error loading alarms")
@@ -140,9 +159,7 @@ fun AlarmScreen(
                         LazyColumn {
                             items(alarms.size, key = { alarms[it].id }) { index ->
                                 val alarm = alarms[index]
-                                val dismissState = rememberSwipeToDismissBoxState(
-                                    initialValue = SwipeToDismissBoxValue.Settled
-                                )
+                                val dismissState = rememberSwipeToDismissBoxState()
                                 val currentAlarm by rememberUpdatedState(alarm)
 
                                 LaunchedEffect(dismissState.currentValue) {

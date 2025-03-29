@@ -32,6 +32,7 @@ class WeatherRepository(
     suspend fun getAllAlarms(): Flow<List<WeatherAlarmEntity>> = localDataSource.getAllAlarms()
     suspend fun getAlarmById(id: Int) = localDataSource.getAlarmById(id)
     suspend fun deleteAlarm(alarm: WeatherAlarmEntity) = localDataSource.deleteAlarm(alarm)
+    suspend fun deleteAlarmById(alarmId: Int) = localDataSource.deleteAlarmById(alarmId)
 
     companion object {
         @Volatile private var INSTANCE: WeatherRepository? = null

@@ -276,6 +276,15 @@ fun AddAlarmScreen(
                                             set(Calendar.MINUTE, endTime!!.second)
                                         }
 
+                                        if (triggerType == "alarm" && !Settings.canDrawOverlays(context)) {
+                                            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+                                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                            }
+                                            context.startActivity(intent)
+                                            Toast.makeText(context, "Please grant 'Draw over other apps' permission", Toast.LENGTH_LONG).show()
+                                            return@Button
+                                        }
+
                                         val alarm = WeatherAlarmEntity(
                                             cityName = city,
                                             lat = lat!!,

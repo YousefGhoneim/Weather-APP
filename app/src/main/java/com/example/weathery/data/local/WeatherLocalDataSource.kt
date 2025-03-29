@@ -14,6 +14,7 @@ class WeatherLocalDataSource(private val dao: WeatherDao) {
         return dao.insertAlarm(alarm).toInt()
     }
     suspend fun deleteExpiredAlarms(currentTime: Long) = dao.deleteExpiredAlarms(currentTime)
+    suspend fun deleteAlarmById(alarmId: Int) = dao.deleteAlarmById(alarmId)
 
 
     fun getAllAlarms(): Flow<List<WeatherAlarmEntity>> = dao.getAllAlarms()

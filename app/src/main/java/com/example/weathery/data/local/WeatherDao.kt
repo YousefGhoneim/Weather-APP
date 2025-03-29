@@ -36,4 +36,7 @@ interface WeatherDao {
 
     @Query("SELECT * FROM weather_alarms WHERE id = :id")
     suspend fun getAlarmById(id: Int): WeatherAlarmEntity?
+
+    @Query("DELETE FROM weather_alarms WHERE id = :alarmId")
+    suspend fun deleteAlarmById(alarmId: Int): Int
 }
