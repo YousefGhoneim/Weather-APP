@@ -12,6 +12,7 @@ import com.example.weathery.data.remote.WeatherRemoteDataSource
 import com.example.weathery.data.repo.WeatherRepository
 import com.example.weathery.favourite.FavoritesViewModel
 import com.example.weathery.home.WeatherViewModel
+import com.example.weathery.ui.theme.WeatheryTheme
 
 class PreviewWeatherActivity : AppCompatActivity() {
     private lateinit var weatherViewModel: WeatherViewModel
@@ -41,7 +42,15 @@ class PreviewWeatherActivity : AppCompatActivity() {
         val alarmId = intent.getIntExtra("alarm_id", -1)
 
         setContent {
-            PreviewWeatherScreen( lat, lon, city, weatherViewModel, favViewModel, onBack = { finish() } )
+            WeatheryTheme {
+                PreviewWeatherScreen(
+                    lat,
+                    lon,
+                    city,
+                    weatherViewModel,
+                    favViewModel,
+                    onBack = { finish() })
+            }
         }
     }
 }

@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.airbnb.lottie.compose.*
 import com.example.weathery.R
@@ -140,12 +141,16 @@ fun AddAlarmScreen(
                         .verticalScroll(rememberScrollState())
                         .padding(12.dp)
                 ) {
-                    Text("Add Alarm", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.add_alarm), style = MaterialTheme.typography.titleLarge)
                     Spacer(Modifier.height(8.dp))
 
-                    Text("Picked Location: ${if (city.isNotEmpty()) city else "None"}")
+                    Text(
+                        stringResource(
+                            R.string.picked_location,
+                            city.ifEmpty { "None" }
+                        ))
                     if (showErrors && (lat == null || lon == null)) {
-                        Text("Please select a location", color = Color.Red)
+                        Text(stringResource(R.string.please_select_a_location), color = Color.Red)
                     }
 
                     Button(onClick = onPickLocationFromMap, modifier = Modifier.fillMaxWidth()) {

@@ -5,7 +5,9 @@ data class HourlyWeatherUiModel(
     val iconRes: Int,
     val temp: Int,
     val feelsLike: Int,
-    val description: String
+    val description: String,
+    val windSpeed: Double
+
 )
 
 

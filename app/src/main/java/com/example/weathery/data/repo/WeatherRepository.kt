@@ -4,6 +4,7 @@ import com.example.weathery.data.local.CityEntity
 import com.example.weathery.data.local.WeatherAlarmEntity
 import com.example.weathery.data.local.WeatherLocalDataSource
 import com.example.weathery.data.models.OneResponse
+import com.example.weathery.data.models.WeatherUiModel
 import com.example.weathery.data.remote.WeatherRemoteDataSource
 import kotlinx.coroutines.flow.Flow
 
@@ -13,16 +14,16 @@ class WeatherRepository(
 ) {
 
     // 🔹 Remote (API)
-    suspend fun fetchWeather(lat: Double, lon: Double): OneResponse {
-        return remoteDataSource.getWeather(lat, lon)
+    suspend fun fetchWeather(lat: Double, lon: Double , units: String): OneResponse {
+        return remoteDataSource.getWeather(lat, lon , units)
     }
 
-    // 🔹 Favorites
+    //  Favorites
     suspend fun saveCity(city: CityEntity) = localDataSource.insertCity(city)
     fun getFavoriteCities(): Flow<List<CityEntity>> = localDataSource.getAllCities()
     suspend fun deleteCity(city: CityEntity) = localDataSource.deleteCity(city)
 
-    // 🔹 Alarms
+    //  Alarms
     suspend fun saveAlarm(alarm: WeatherAlarmEntity): Int {
         return localDataSource.insertAlarm(alarm)
     }
@@ -33,6 +34,17 @@ class WeatherRepository(
     suspend fun getAlarmById(id: Int) = localDataSource.getAlarmById(id)
     suspend fun deleteAlarm(alarm: WeatherAlarmEntity) = localDataSource.deleteAlarm(alarm)
     suspend fun deleteAlarmById(alarmId: Int) = localDataSource.deleteAlarmById(alarmId)
+
+
+    // cash
+    suspend fun cacheWeather(city: String, weather: WeatherUiModel) {
+        localDataSource.saveCachedWeather(city, weather)
+    }
+
+    suspend fun getCachedWeather(): WeatherUiModel? {
+        return localDataSource.getCachedWeather()
+    }
+
 
     companion object {
         @Volatile private var INSTANCE: WeatherRepository? = null

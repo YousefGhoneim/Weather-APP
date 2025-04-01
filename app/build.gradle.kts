@@ -107,6 +107,11 @@ dependencies {
     implementation ("androidx.lifecycle:lifecycle-runtime:2.8.7")
     implementation ("androidx.lifecycle:lifecycle-viewmodel:2.8.7")
     implementation ("androidx.savedstate:savedstate:1.2.1")
+    implementation("androidx.compose.runtime:runtime:1.7.8")
+    implementation ("com.google.accompanist:accompanist-permissions:0.31.5-beta")
+
+
+
 
 
 

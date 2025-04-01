@@ -36,10 +36,14 @@ import com.example.weathery.favourite.FavoritesViewModel
 import com.example.weathery.home.HomeScreen
 import com.example.weathery.home.WeatherViewModel
 import com.example.weathery.setting.SettingsScreen
+import com.example.weathery.setting.SettingsViewModel
 
 @Composable
 fun MainNavigation() {
     val navController = rememberNavController()
+    val context = LocalContext.current
+    val settingsViewModel = remember { SettingsViewModel(context) }
+
     val items = listOf(
         ScreenRoute.Home,
         ScreenRoute.Favorites,
@@ -82,29 +86,32 @@ fun MainNavigation() {
             startDestination = ScreenRoute.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            // Home
             composable(ScreenRoute.Home.route) {
                 val viewModel: WeatherViewModel = viewModel(factory = WeatherViewModel.WeatherViewModelFactory(
                     WeatherRepository(
                         WeatherRemoteDataSource(RetrofitHelper.service),
-                        WeatherLocalDataSource(WeatherDatabase.getInstance(LocalContext.current).weatherDao())
+                        WeatherLocalDataSource(WeatherDatabase.getInstance(context).weatherDao())
                     )
                 ))
-                HomeScreen(viewModel)
+                HomeScreen(
+                    viewModel = viewModel,
+                    navigateToMap = {
+                        navController.navigate("mapPickerFromSettings")
+                    }
+                )
             }
 
-            // Favorites
             composable(ScreenRoute.Favorites.route) {
                 val favViewModel: FavoritesViewModel = viewModel(factory = FavoritesViewModel.FavoritesViewModelFactory(
                     WeatherRepository(
                         WeatherRemoteDataSource(RetrofitHelper.service),
-                        WeatherLocalDataSource(WeatherDatabase.getInstance(LocalContext.current).weatherDao())
+                        WeatherLocalDataSource(WeatherDatabase.getInstance(context).weatherDao())
                     )
                 ))
                 FavoritesScreen(
                     viewModel = favViewModel,
                     onPickLocation = {
-                        navController.navigate("mapPicker")
+                        navController.navigate("mapPickerFromFavorites")
                     },
                     onCityClick = { lat, lon, city ->
                         navController.navigate("preview/$lat/$lon/$city")
@@ -112,22 +119,19 @@ fun MainNavigation() {
                 )
             }
 
-            // Alarm route
             composable(ScreenRoute.Alarm.route) {
                 val alarmsViewModel: AlarmsViewModel = viewModel(factory = AlarmsViewModel.AlarmsViewModelFactory(
                     WeatherRepository(
                         WeatherRemoteDataSource(RetrofitHelper.service),
-                        WeatherLocalDataSource(
-                            WeatherDatabase.getInstance(LocalContext.current).weatherDao()
-                        )
+                        WeatherLocalDataSource(WeatherDatabase.getInstance(context).weatherDao())
                     )
                 ))
 
                 AlarmScreen(
                     viewModel = alarmsViewModel,
-                    navController = navController, // 👈 so FAB can navigate
+                    navController = navController,
                     onPickLocationFromMap = { onLocationSelected ->
-                        navController.navigate("mapPickerForAlarm")
+                        navController.navigate("mapPickerFromAlarm")
                         navController.currentBackStackEntry
                             ?.savedStateHandle
                             ?.getLiveData<Triple<Double, Double, String>>("picked_alarm_location")
@@ -143,12 +147,11 @@ fun MainNavigation() {
                 )
             }
 
-
             composable("addAlarm") { backStackEntry ->
                 val alarmsViewModel: AlarmsViewModel = viewModel(factory = AlarmsViewModel.AlarmsViewModelFactory(
                     WeatherRepository(
                         WeatherRemoteDataSource(RetrofitHelper.service),
-                        WeatherLocalDataSource(WeatherDatabase.getInstance(LocalContext.current).weatherDao())
+                        WeatherLocalDataSource(WeatherDatabase.getInstance(context).weatherDao())
                     )
                 ))
 
@@ -163,8 +166,7 @@ fun MainNavigation() {
                         navController.navigate(ScreenRoute.Alarm.route) {
                             popUpTo("addAlarm") { inclusive = true }
                         }
-                    }
-                    ,
+                    },
                     onPickLocationFromMap = {
                         navController.navigate("mapPickerForAddAlarm")
                     },
@@ -173,11 +175,9 @@ fun MainNavigation() {
                         navController.navigate(ScreenRoute.Alarm.route) {
                             popUpTo("addAlarm") { inclusive = true }
                         }
-                    }
-                    ,
+                    },
                     viewModel = alarmsViewModel
                 )
-
 
                 LaunchedEffect(location) {
                     if (location != null) {
@@ -198,10 +198,7 @@ fun MainNavigation() {
                 )
             }
 
-
-            // Preview Screen
-            composable(
-                route = "preview/{lat}/{lon}/{city}",
+            composable("preview/{lat}/{lon}/{city}",
                 arguments = listOf(
                     navArgument("lat") { type = NavType.StringType },
                     navArgument("lon") { type = NavType.StringType },
@@ -215,14 +212,14 @@ fun MainNavigation() {
                 val weatherViewModel: WeatherViewModel = viewModel(factory = WeatherViewModel.WeatherViewModelFactory(
                     WeatherRepository(
                         WeatherRemoteDataSource(RetrofitHelper.service),
-                        WeatherLocalDataSource(WeatherDatabase.getInstance(LocalContext.current).weatherDao())
+                        WeatherLocalDataSource(WeatherDatabase.getInstance(context).weatherDao())
                     )
                 ))
 
                 val favViewModel: FavoritesViewModel = viewModel(factory = FavoritesViewModel.FavoritesViewModelFactory(
                     WeatherRepository(
                         WeatherRemoteDataSource(RetrofitHelper.service),
-                        WeatherLocalDataSource(WeatherDatabase.getInstance(LocalContext.current).weatherDao())
+                        WeatherLocalDataSource(WeatherDatabase.getInstance(context).weatherDao())
                     )
                 ))
 
@@ -236,8 +233,17 @@ fun MainNavigation() {
                 )
             }
 
-            // Map for Favorites
-            composable("mapPicker") {
+            composable("mapPickerFromSettings") {
+                OsmMapPickerScreen(
+                    onLocationSelected = { lat, lon, city ->
+                        settingsViewModel.setPickedLocation(lat, lon, city)
+                        navController.popBackStack(ScreenRoute.Home.route, inclusive = false)
+                    },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable("mapPickerFromFavorites") {
                 OsmMapPickerScreen(
                     onLocationSelected = { lat, lon, city ->
                         navController.navigate("preview/$lat/$lon/$city")
@@ -246,9 +252,21 @@ fun MainNavigation() {
                 )
             }
 
-            // Settings
+            composable("mapPickerFromAlarm") {
+                OsmMapPickerScreen(
+                    onLocationSelected = { lat, lon, city ->
+                        navController.navigate("preview/$lat/$lon/$city")
+                    },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
             composable(ScreenRoute.Settings.route) {
-                SettingsScreen()
+                SettingsScreen(
+                    onRequestMapPicker = {
+                        navController.navigate("mapPickerFromSettings")
+                    }
+                )
             }
         }
     }

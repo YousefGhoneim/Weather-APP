@@ -39,4 +39,12 @@ interface WeatherDao {
 
     @Query("DELETE FROM weather_alarms WHERE id = :alarmId")
     suspend fun deleteAlarmById(alarmId: Int): Int
+
+
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCachedWeather(weather: CachedWeatherEntity)
+
+    @Query("SELECT * FROM cached_weather WHERE id = 0")
+    suspend fun getCachedWeather(): CachedWeatherEntity?
 }

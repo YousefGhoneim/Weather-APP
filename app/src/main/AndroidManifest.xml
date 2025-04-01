@@ -39,13 +39,13 @@
             />
         <activity
             android:name=".alarm.AlarmOverlayActivity"
-            android:exported="true"
+            android:exported="false"
             android:theme="@style/Theme.Transparent.NoTitle.FullWidthBanner"
             android:taskAffinity=""
             android:launchMode="singleTop" />
         <activity
             android:name=".alarm.PreviewWeatherActivity"
-            android:theme="@style/Theme.AppCompat.DayNight.DarkActionBar"
+            android:theme="@style/Theme.Transparent.NoTitle.FullWidthBanner"
         android:label="Preview Weather" />
 
 

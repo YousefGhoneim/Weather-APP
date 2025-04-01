@@ -6,8 +6,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [CityEntity::class, WeatherAlarmEntity::class],
-    version = 3
+    entities = [CityEntity::class, WeatherAlarmEntity::class , CachedWeatherEntity::class],
+    version = 5
 )
 abstract class WeatherDatabase : RoomDatabase() {
 

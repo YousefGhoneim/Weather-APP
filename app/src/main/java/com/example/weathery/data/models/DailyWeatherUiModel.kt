@@ -7,7 +7,8 @@ data class DailyWeatherUiModel(
     val minTemp: Int,
     val feelsLike: Int,
     val iconRes: Int,
-    val description: String
+    val description: String,
+    val windSpeed: Double = 0.0
 )
 
 

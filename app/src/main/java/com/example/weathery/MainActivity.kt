@@ -8,22 +8,30 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.example.weathery.ui.theme.WeatheryTheme
+import com.example.weathery.utils.LanguageUtils
 import com.example.weathery.utils.LocationHandler
 import kotlinx.coroutines.delay
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var locationHandler: LocationHandler
 
+    override fun attachBaseContext(newBase: Context) {
+        val prefs = newBase.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
+        val lang = prefs.getString("language", "device") ?: "device"
+        val languageCode = if (lang == "device") java.util.Locale.getDefault().language else lang
+        val wrapped = LanguageUtils.wrap(newBase, languageCode)
+        super.attachBaseContext(wrapped)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Show native splash screen
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         locationHandler = LocationHandler(this)
 
-        // Request location permission on app launch
         if (!locationHandler.checkPermissions()) {
             locationHandler.requestPermissions()
         }
@@ -33,9 +41,8 @@ class MainActivity : ComponentActivity() {
                 var isLoading by remember { mutableStateOf(true) }
                 var showOnboarding by remember { mutableStateOf(false) }
 
-                // Simulate loading and check onboarding status
                 LaunchedEffect(Unit) {
-                    delay(1000) // splash delay
+                    delay(1000)
                     val prefs = getSharedPreferences("weathery_prefs", Context.MODE_PRIVATE)
                     showOnboarding = !prefs.getBoolean("onboarding_completed", false)
                     isLoading = false
@@ -48,7 +55,6 @@ class MainActivity : ComponentActivity() {
                 if (showOnboarding) {
                     OnboardingScreen(
                         onDone = {
-                            // Save preference and go to main
                             getSharedPreferences("weathery_prefs", Context.MODE_PRIVATE)
                                 .edit().putBoolean("onboarding_completed", true).apply()
                             showOnboarding = false

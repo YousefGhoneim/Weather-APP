@@ -4,6 +4,8 @@ import android.location.Location
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,12 +17,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -34,9 +40,17 @@ import com.example.weathery.data.remote.RetrofitHelper
 import com.example.weathery.data.remote.WeatherRemoteDataSource
 import com.example.weathery.data.repo.WeatherRepository
 import com.example.weathery.favourite.FavoritesViewModel
+import com.example.weathery.setting.SettingsViewModel
 import com.example.weathery.utils.LocationHandler
 import com.example.weathery.utils.getWeatherBorderColor
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.shouldShowRationale
+import kotlinx.coroutines.delay
 
+
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun HomeScreen(
     viewModel: WeatherViewModel,
@@ -45,39 +59,78 @@ fun HomeScreen(
             WeatherRemoteDataSource(RetrofitHelper.service),
             WeatherLocalDataSource(WeatherDatabase.getInstance(LocalContext.current).weatherDao())
         )
-    ))
+    )),
+    navigateToMap: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val activity = context as ComponentActivity
-    val handler = remember { LocationHandler(activity) }
-
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val settingsViewModel = remember { SettingsViewModel(context) }
+
+    val unitSystem by settingsViewModel.unitSystem.collectAsState()
+    val tempUnit by settingsViewModel.tempUnit.collectAsState()
+    val locationSource by settingsViewModel.locationSource.collectAsState()
+    val permissionState = rememberPermissionState(android.Manifest.permission.ACCESS_FINE_LOCATION)
 
     var location by remember { mutableStateOf<Location?>(null) }
     var cityName by remember { mutableStateOf("Unknown") }
     var lastFetchedLocation by remember { mutableStateOf<Location?>(null) }
+    var triggerMapNavigation by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        if (!handler.checkPermissions()) {
-            handler.requestPermissions()
-            return@LaunchedEffect
-        }
+    val fusedLocationClient = remember { com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context) }
 
-        if (!handler.isLocationEnabled()) {
-            Toast.makeText(context, "Please enable location services", Toast.LENGTH_LONG).show()
-            handler.openLocationSettings()
-            return@LaunchedEffect
-        }
+    LaunchedEffect(locationSource, permissionState.status) {
+        Log.d("DEBUG_HOME", "Compose Permission Triggered: Source = $locationSource, Granted = ${permissionState.status.isGranted}")
 
-        handler.getFreshLocation(
-            onLocationFound = { loc, city ->
-                location = loc
-                cityName = city
-            },
-            onError = { msg ->
-                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+        if (locationSource == "gps") {
+            if (!permissionState.status.isGranted) {
+                if (permissionState.status.shouldShowRationale) {
+                    Toast.makeText(context,
+                        context.getString(R.string.permission_denied_switching_to_map), Toast.LENGTH_SHORT).show()
+                    settingsViewModel.setLocationSource("map")
+                    triggerMapNavigation = true
+                } else {
+                    permissionState.launchPermissionRequest()
+                }
+                return@LaunchedEffect
             }
-        )
+
+            try {
+                fusedLocationClient.lastLocation.addOnSuccessListener { loc: Location? ->
+                    if (loc != null) {
+                        location = loc
+                        val geocoder = android.location.Geocoder(context)
+                        val addresses = geocoder.getFromLocation(loc.latitude, loc.longitude, 1)
+                        val city = addresses?.firstOrNull()?.locality ?: context.getString(R.string.unknown)
+                        val admin = addresses?.firstOrNull()?.adminArea ?: ""
+                        val country = addresses?.firstOrNull()?.countryName ?: ""
+                        cityName = listOfNotNull(city, admin, country).filter { it.isNotBlank() }.joinToString(", ")
+                    } else {
+                        Toast.makeText(context,
+                            context.getString(R.string.unable_to_get_location), Toast.LENGTH_SHORT).show()
+                        settingsViewModel.setLocationSource("map")
+                        triggerMapNavigation = true
+                    }
+                }
+            } catch (e: SecurityException) {
+                Toast.makeText(context,
+                    context.getString(R.string.permission_error, e.localizedMessage), Toast.LENGTH_SHORT).show()
+            }
+        } else if (locationSource == "map") {
+            val picked = settingsViewModel.getPickedLocation()
+            if (picked != null) {
+                val (lat, lon, city) = picked
+                viewModel.fetchWeather(lat, lon, city, unitSystem)
+            } else {
+                Toast.makeText(context,
+                    context.getString(R.string.please_pick_a_location_from_map), Toast.LENGTH_SHORT).show()
+                triggerMapNavigation = true
+            }
+        }
+    }
+
+    if (triggerMapNavigation) {
+        triggerMapNavigation = false
+        navigateToMap()
     }
 
     LaunchedEffect(location) {
@@ -86,37 +139,31 @@ fun HomeScreen(
                     newLocation.distanceTo(lastFetchedLocation!!) > 100
 
             if (isNew) {
-                viewModel.fetchWeather(newLocation.latitude, newLocation.longitude, cityName)
+                viewModel.fetchWeather(newLocation.latitude, newLocation.longitude, cityName, unitSystem)
                 lastFetchedLocation = newLocation
-            } else {
-                Log.d("HomeScreen", "Location unchanged. Skipping fetch.")
             }
         }
     }
 
     when (state) {
-        is UiState.Loading -> Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) { CircularProgressIndicator() }
-
+        is UiState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) {
+            CircularProgressIndicator()
+        }
         is UiState.Success -> {
             val data = (state as UiState.Success).data
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxSize()) {
                 WeatherLottieBackground(data.current.main)
-
                 Box(
-                    modifier = Modifier
+                    Modifier
                         .matchParentSize()
                         .background(MaterialTheme.colorScheme.background.copy(alpha = 0.3f))
                 )
-
                 Column(
-                    modifier = Modifier
+                    Modifier
                         .padding(16.dp)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    CurrentWeatherSection(data.current) {
+                    CurrentWeatherSection(data.current, tempUnit) {
                         location?.let {
                             val cityEntity = CityEntity(
                                 name = data.current.cityName,
@@ -124,22 +171,24 @@ fun HomeScreen(
                                 lon = it.longitude
                             )
                             favViewModel.saveCity(cityEntity)
-                            Toast.makeText(context, "Added to favorites", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context,
+                                context.getString(R.string.added_to_favorites), Toast.LENGTH_SHORT).show()
                         }
                     }
                     Spacer(Modifier.height(16.dp))
                     ExtraMetricsSection(data.extra)
                     Spacer(Modifier.height(16.dp))
                     Text("Hourly Details", style = MaterialTheme.typography.titleMedium)
-                    HourlyForecastSection(data.hourly)
+                    HourlyForecastSection(data.hourly, tempUnit, data.extra.windUnit)
                     Spacer(Modifier.height(16.dp))
-                    DailyForecastSection(data.daily)
+                    DailyForecastSection(data.daily, tempUnit, data.extra.windUnit)
+                    Spacer(Modifier.height(16.dp))
+                    BottomMetricsSection(data.extra)
                 }
             }
         }
-
-        is UiState.Error -> Text("Error: ${(state as UiState.Error).message}")
-        is UiState.Empty -> Text("No data available.")
+        is UiState.Error -> Text(stringResource(R.string.error, (state as UiState.Error).message))
+        is UiState.Empty -> Text(stringResource(R.string.no_data_available))
     }
 }
 
@@ -147,8 +196,15 @@ fun HomeScreen(
 @Composable
 fun CurrentWeatherSection(
     weather: CurrentWeatherUiModel,
+    tempUnitLabel: String,
     onFavClick: () -> Unit
 ) {
+    val tempSymbol = when (tempUnitLabel) {
+        "metric" -> "°C"
+        "imperial" -> "°F"
+        else -> "K"
+    }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -171,7 +227,7 @@ fun CurrentWeatherSection(
             ) {
                 Icon(
                     imageVector = Icons.Default.Favorite,
-                    contentDescription = "Add to favorites",
+                    contentDescription = stringResource(R.string.add_to_favorites),
                     tint = Color.Red
                 )
             }
@@ -185,8 +241,8 @@ fun CurrentWeatherSection(
         )
 
         Text(
-            text = "${weather.temp}°",
-            style = MaterialTheme.typography.displayLarge
+            text = "${weather.temp}$tempUnitLabel",
+            style = MaterialTheme.typography.displayMedium
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -195,13 +251,12 @@ fun CurrentWeatherSection(
             horizontalArrangement = Arrangement.Center,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("🌇 Sunset ${weather.sunset}")
+            Text(stringResource(R.string.sunset, weather.sunset))
             Spacer(Modifier.width(16.dp))
-            Text("🌅 Sunrise ${weather.sunrise}")
+            Text(stringResource(R.string.sunrise, weather.sunrise))
         }
     }
 }
-
 
 @Composable
 fun ExtraMetricsSection(metrics: ExtraMetricsUiModel) {
@@ -228,7 +283,12 @@ fun MetricItem(title: String, value: String) {
 }
 
 @Composable
-fun HourlyForecastSection(hourlyList: List<HourlyWeatherUiModel>) {
+fun HourlyForecastSection(hourlyList: List<HourlyWeatherUiModel>, tempUnitLabel: String, windUnit: String) {
+    val tempSymbol = when (tempUnitLabel) {
+        "metric" -> "°C"
+        "imperial" -> "°F"
+        else -> "K"
+    }
     LazyRow(contentPadding = PaddingValues(horizontal = 8.dp)) {
         items(hourlyList.size) { index ->
             val item = hourlyList[index]
@@ -237,7 +297,7 @@ fun HourlyForecastSection(hourlyList: List<HourlyWeatherUiModel>) {
             Card(
                 modifier = Modifier
                     .padding(horizontal = 8.dp, vertical = 4.dp)
-                    .size(width = 80.dp, height = 130.dp)
+                    .size(width = 100.dp, height = 150.dp)
                     .border(
                         width = 2.dp,
                         color = borderColor,
@@ -260,17 +320,21 @@ fun HourlyForecastSection(hourlyList: List<HourlyWeatherUiModel>) {
                         contentDescription = null,
                         modifier = Modifier.size(32.dp)
                     )
-                    Text(text = "${item.temp}°", style = MaterialTheme.typography.bodyLarge)
+                    Text(text = "🌡️ ${item.temp}$tempUnitLabel", style = MaterialTheme.typography.bodyMedium)
+                    Text(text = "🌀 ${item.windSpeed} $windUnit", style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
     }
 }
 
-
-
 @Composable
-fun DailyForecastSection(dailyList: List<DailyWeatherUiModel>) {
+fun DailyForecastSection(dailyList: List<DailyWeatherUiModel>, tempUnitLabel: String, windUnit: String) {
+    val tempSymbol = when (tempUnitLabel) {
+        "metric" -> "°C"
+        "imperial" -> "°F"
+        else -> "K"
+    }
     Column {
         Text("Next 7 Days", style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.height(8.dp))
@@ -290,8 +354,7 @@ fun DailyForecastSection(dailyList: List<DailyWeatherUiModel>) {
                 shape = MaterialTheme.shapes.medium,
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.Transparent)
-            )
-        {
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -318,8 +381,10 @@ fun DailyForecastSection(dailyList: List<DailyWeatherUiModel>) {
                         modifier = Modifier.weight(1f),
                         horizontalAlignment = Alignment.End
                     ) {
-                        Text(text = "Max: ${day.maxTemp}°", style = MaterialTheme.typography.bodyMedium)
-                        Text(text = "Min: ${day.minTemp}°", style = MaterialTheme.typography.labelSmall)
+                        Text("🌡️ Max: ${day.maxTemp}$tempUnitLabel", style = MaterialTheme.typography.bodyMedium)
+                        Text("Min: ${day.minTemp}$tempUnitLabel", style = MaterialTheme.typography.labelSmall)
+                        Text("Feels like: ${day.feelsLike}$tempUnitLabel", style = MaterialTheme.typography.labelSmall)
+                        Text("🌀 ${day.windSpeed} $windUnit", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
@@ -331,9 +396,9 @@ fun DailyForecastSection(dailyList: List<DailyWeatherUiModel>) {
 fun WeatherLottieBackground(condition: String) {
     Log.i("TAG", "WeatherLottieBackground: $condition")
     val animationRes = when {
-        "clear" in condition.lowercase() -> R.raw.sun
+        "clear" in condition.lowercase() -> R.raw.sunny_modified
         "cloud" in condition.lowercase() -> R.raw.cloud
-        "rain" in condition.lowercase() -> R.raw.rain
+        "rain" in condition.lowercase() -> R.raw.rainy
         "snow" in condition.lowercase() -> R.raw.snow
         else -> R.raw.cloud
     }
@@ -351,5 +416,108 @@ fun WeatherLottieBackground(condition: String) {
         contentScale = ContentScale.Crop
     )
 }
+
+@Composable
+fun MetricArc(title: String, value: Float, max: Float, unit: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(title, style = MaterialTheme.typography.labelMedium)
+        Canvas(modifier = Modifier.size(72.dp)) {
+            drawArc(
+                startAngle = 150f,
+                sweepAngle = 240f,
+                useCenter = false,
+                color = Color(0xFFF1F1F1),
+                style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
+            )
+            drawArc(
+                startAngle = 150f,
+                sweepAngle = (value / max) * 240f,
+                useCenter = false,
+                color = color,
+                style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
+            )
+        }
+        Text("${value.toInt()} $unit", style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+fun BottomMetricsSection(metrics: ExtraMetricsUiModel) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Environment Metrics", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(12.dp))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            item {
+                MetricArcCard("Pressure", metrics.pressure.toFloat(), 1100f, "hPa", Color(0xFFfc466b))
+            }
+            item {
+                MetricArcCard("Humidity", metrics.humidity.toFloat(), 100f, "%", Color(0xFF1c92d2))
+            }
+            item {
+                MetricArcCard("Wind", metrics.windSpeed.toFloat(), 30f, metrics.windUnit, Color(0xFF36d1dc))
+            }
+            item {
+                MetricArcCard("UV", metrics.uvi.toFloat(), 11f, "", Color(0xFFf7971e))
+            }
+        }
+
+    }
+}
+
+@Composable
+fun MetricArcCard(
+    title: String,
+    value: Float,
+    max: Float,
+    unit: String,
+    color: Color
+) {
+    Card(
+        modifier = Modifier
+            .padding(8.dp)
+            .size(100.dp),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        border = BorderStroke(2.dp, color),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(8.dp)
+                .fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Text(title, style = MaterialTheme.typography.labelSmall)
+            Canvas(modifier = Modifier.size(52.dp)) {
+                drawArc(
+                    startAngle = 150f,
+                    sweepAngle = 240f,
+                    useCenter = false,
+                    color = Color(0xFFF1F1F1),
+                    style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
+                )
+                drawArc(
+                    startAngle = 150f,
+                    sweepAngle = (value / max) * 240f,
+                    useCenter = false,
+                    color = color,
+                    style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
+                )
+            }
+            Text("${value.toInt()} $unit", style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
 
 

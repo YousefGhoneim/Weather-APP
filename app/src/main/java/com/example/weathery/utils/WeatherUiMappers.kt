@@ -4,11 +4,21 @@ import android.util.Log
 import com.example.weathery.R
 import com.example.weathery.data.models.*
 
-
-fun OneResponse.toWeatherUiModel(cityName: String): WeatherUiModel {
+fun OneResponse.toWeatherUiModel(cityName: String, unitSystem: String): WeatherUiModel {
     val current = current ?: throw IllegalStateException("Current weather is missing")
     val dailyList = daily?.filterNotNull() ?: emptyList()
     val hourlyList = hourly?.filterNotNull() ?: emptyList()
+
+    val windUnitLabel = when (unitSystem) {
+        "imperial" -> "mph"
+        else -> "m/s"
+    }
+
+    val tempSymbol = when (unitSystem) {
+        "metric" -> "°C"
+        "imperial" -> "°F"
+        else -> "K"
+    }
 
     return WeatherUiModel(
         current = CurrentWeatherUiModel(
@@ -28,10 +38,10 @@ fun OneResponse.toWeatherUiModel(cityName: String): WeatherUiModel {
                 iconRes = getWeatherIconRes(it.weather?.firstOrNull()?.icon),
                 temp = it.temp?.toInt() ?: 0,
                 feelsLike = it.feelsLike?.toInt() ?: 0,
-                description = it.weather?.firstOrNull()?.description ?: ""
+                description = it.weather?.firstOrNull()?.description ?: "",
+                windSpeed = it.windSpeed ?: 0.0
             )
-        }
-        ,
+        },
         daily = dailyList.map {
             DailyWeatherUiModel(
                 dayName = it.dt?.toFormatted("EEEE") ?: "",
@@ -40,22 +50,20 @@ fun OneResponse.toWeatherUiModel(cityName: String): WeatherUiModel {
                 minTemp = it.temp?.min?.toInt() ?: 0,
                 feelsLike = it.feelsLike?.day?.toInt() ?: 0,
                 iconRes = getWeatherIconRes(it.weather?.firstOrNull()?.icon),
-                description = it.weather?.firstOrNull()?.description ?: ""
+                description = it.weather?.firstOrNull()?.description ?: "",
+                windSpeed = it.windSpeed ?: 0.0
             )
-        }
-
-        ,
+        },
         extra = ExtraMetricsUiModel(
             pressure = current.pressure ?: 0,
             windSpeed = current.windSpeed ?: 0.0,
             humidity = current.humidity ?: 0,
             uvi = current.uvi ?: 0.0,
             clouds = current.clouds ?: 0,
-            windUnit = "m/s" // Default; should come from settings if dynamic
+            windUnit = windUnitLabel
         )
     )
 }
-
 
 fun getWeatherIconRes(iconCode: String?): Int {
     return when (iconCode) {
@@ -70,6 +78,5 @@ fun getWeatherIconRes(iconCode: String?): Int {
         "13d", "13n" -> R.drawable.ic_snow
         "50d", "50n" -> R.drawable.ic_fog
         else -> R.drawable.ic_weather_placeholder
-
     }
 }

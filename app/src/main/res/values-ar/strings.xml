@@ -1,0 +1,30 @@
+<resources>
+    <string name="app_name">ويذري</string>
+    <string name="language">اللغة</string>
+    <string name="device_language">استخدم لغة الجهاز</string>
+    <string name="english">الإنجليزية</string>
+    <string name="arabic">العربية</string>
+    <string name="measurement_system">نظام القياس (الحرارة + الرياح)</string>
+    <string name="metric">متري (°م، م/ث)</string>
+    <string name="imperial">إنجليزي (°ف، ميل/س)</string>
+    <string name="standard">قياسي (كلفن، م/ث)</string>
+    <string name="location_source">مصدر الموقع</string>
+    <string name="gps">GPS</string>
+    <string name="map_picker">اختيار من الخريطة</string>
+    <string name="add_alarm">إضافة منبه</string>
+    <string name="save">حفظ</string>
+    <string name="cancel">إلغاء</string>
+    <string name="pick_location">اختر الموقع</string>
+    <string name="change_location">تغيير الموقع</string>
+    <string name="start_time">وقت البدء</string>
+    <string name="end_time">وقت الانتهاء</string>
+    <string name="repeat_on_days">تكرار في الأيام</string>
+    <string name="condition_type">نوع الشرط</string>
+    <string name="trigger_type">نوع التنبيه</string>
+    <string name="notification">إشعار</string>
+    <string name="alarm">منبه</string>
+    <string name="confirm_location">تأكيد الموقع</string>
+    <string name="search_city">ابحث عن مدينة</string>
+    <string name="city">المدينة</string>
+    <string name="get_started">ابدأ</string>
+</resources>
