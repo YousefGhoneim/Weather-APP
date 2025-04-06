@@ -20,6 +20,7 @@ import androidx.compose.ui.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -47,11 +48,9 @@ fun AlarmScreen(
 
     var showOverlayPermissionDialog by remember { mutableStateOf(false) }
 
-    // Listen to alarm broadcasts (previously used for AlarmBanner)
     DisposableEffect(Unit) {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
-                // Previously used for AlarmBanner
             }
         }
         ContextCompat.registerReceiver(
@@ -68,8 +67,8 @@ fun AlarmScreen(
     LaunchedEffect(deletedAlarm) {
         deletedAlarm?.let { alarm ->
             val result = snackbarHostState.showSnackbar(
-                message = "${alarm.cityName} removed",
-                actionLabel = "Undo",
+                message = context.getString(R.string.removedd, alarm.cityName),
+                actionLabel = context.getString(R.string.undoo),
                 duration = SnackbarDuration.Long,
                 withDismissAction = true
             )
@@ -83,8 +82,8 @@ fun AlarmScreen(
     if (showOverlayPermissionDialog) {
         AlertDialog(
             onDismissRequest = { showOverlayPermissionDialog = false },
-            title = { Text("Overlay Permission Required") },
-            text = { Text("To display alarms over other apps, please allow overlay permission in settings.") },
+            title = { Text(stringResource(R.string.overlay_permission_required)) },
+            text = { Text(stringResource(R.string.to_display_alarms_over_other_apps_please_allow_overlay_permission_in_settings)) },
             confirmButton = {
                 TextButton(onClick = {
                     showOverlayPermissionDialog = false
@@ -93,12 +92,12 @@ fun AlarmScreen(
                     }
                     context.startActivity(intent)
                 }) {
-                    Text("Go to Settings")
+                    Text(stringResource(R.string.go_to_settings))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showOverlayPermissionDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -117,7 +116,7 @@ fun AlarmScreen(
                 },
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Alarm")
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_alarmm))
             }
         }
     ) { padding ->
@@ -226,14 +225,14 @@ fun FancyAlarmCard(
         ) {
             Column {
                 Text(text = alarm.cityName, style = MaterialTheme.typography.titleMedium)
-                Text(text = "Time: $start → $end", style = MaterialTheme.typography.bodyMedium)
+                Text(text = stringResource(R.string.time, start, end), style = MaterialTheme.typography.bodyMedium)
                 if (alarm.conditionType.isNotEmpty()) {
                     val conditionDisplay = if (alarm.conditionType == "weather") {
                         alarm.condition
                     } else {
                         "${alarm.conditionType}: ${alarm.thresholdValue ?: "?"}"
                     }
-                    Text("Condition: $conditionDisplay", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.conditionn, conditionDisplay), style = MaterialTheme.typography.bodySmall)
                 }
             }
             IconButton(onClick = onDelete) {

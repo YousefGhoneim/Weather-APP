@@ -1,5 +1,6 @@
 package com.example.weathery.favourite
 
+import android.content.Context
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,6 +34,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -50,12 +53,14 @@ fun FavoritesScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var deletedCityForUndo by remember { mutableStateOf<CityEntity?>(null) }
+    val context = LocalContext.current
+
 
     LaunchedEffect(deletedCityForUndo) {
         deletedCityForUndo?.let { city ->
             val result = snackbarHostState.showSnackbar(
-                message = "${city.name} removed",
-                actionLabel = "Undo",
+                message = context.getString(R.string.removed, city.name),
+                actionLabel = context.getString(R.string.undo),
                 duration = SnackbarDuration.Long,
                 withDismissAction = true
             )
@@ -79,7 +84,7 @@ fun FavoritesScreen(
                     onClick = onPickLocation,
                     containerColor = MaterialTheme.colorScheme.primary
                 ) {
-                    Icon(Icons.Default.Place, contentDescription = "Pick location to add")
+                    Icon(Icons.Default.Place, contentDescription = stringResource(R.string.pick_location_to_add))
                 }
 
                 SnackbarHost(
@@ -116,8 +121,8 @@ fun FavoritesScreen(
             Column(modifier = Modifier.padding(16.dp)) {
                 when (state) {
                     is UiState.Loading -> CircularProgressIndicator()
-                    is UiState.Error -> Text("Error loading favorites")
-                    is UiState.Empty -> Text("No favorite cities yet")
+                    is UiState.Error -> Text(stringResource(R.string.error_loading_favorites))
+                    is UiState.Empty -> Text(stringResource(R.string.no_favorite_cities_yet))
                     is UiState.Success<*> -> {
                         LazyColumn {
                             items(favorites.size, key = { favorites[it].name }) { index ->
@@ -174,12 +179,12 @@ private fun FancyCityCard(
     val scale by animateFloatAsState(
         targetValue = if (animateDelete) 1.3f else 1f,
         animationSpec = tween(durationMillis = 200),
-        label = "DeleteIconScale"
+        label = stringResource(R.string.deleteiconscale)
     )
     val rotation by animateFloatAsState(
         targetValue = if (animateDelete) 15f else 0f,
         animationSpec = tween(durationMillis = 200),
-        label = "DeleteIconRotate"
+        label = stringResource(R.string.deleteiconrotate)
     )
 
     Card(

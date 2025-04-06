@@ -5,69 +5,82 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.util.Log
 import com.example.weathery.data.local.WeatherAlarmEntity
-import com.example.weathery.data.local.WeatherDatabase
-import com.example.weathery.data.local.WeatherLocalDataSource
-import com.example.weathery.data.remote.RetrofitHelper
-import com.example.weathery.data.remote.WeatherRemoteDataSource
-import com.example.weathery.data.repo.WeatherRepository
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.*
 
 object AlarmScheduler {
 
-    fun scheduleSnoozedAlarm(context: Context, triggerAtMillis: Long) {
-        CoroutineScope(Dispatchers.IO).launch {
-            val db = WeatherDatabase.getInstance(context)
-            val dao = db.weatherDao()
-            val local = WeatherLocalDataSource(dao)
-            val remote = WeatherRemoteDataSource(RetrofitHelper.service)
-            val repo = WeatherRepository.getInstance(remote, local)
-
-            val alarm = WeatherAlarmEntity(
-                cityName = "Snoozed Alarm",
-                lat = 0.0,
-                lon = 0.0,
-                startTime = triggerAtMillis,
-                endTime = triggerAtMillis + 60_000,
-                conditionType = "",
-                condition = "",
-                thresholdValue = null,
-                triggerType = "alarm"
-            )
-
-            val alarmId = repo.saveAlarm(alarm)
-
-            withContext(Dispatchers.Main) {
-                scheduleAlarm(context, triggerAtMillis, alarmId, alarmId)
-            }
-        }
+    private fun formatTime(millis: Long): String {
+        val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
+        return sdf.format(Date(millis))
     }
 
     @SuppressLint("ScheduleExactAlarm")
-    fun scheduleAlarm(context: Context, alarmTime: Long, requestCode: Int, alarmId: Int) {
+    fun scheduleAlarm(context: Context, alarm: WeatherAlarmEntity) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
         val intent = Intent(context, AlarmReceiver::class.java).apply {
-            putExtra("alarm_id", alarmId)
+            putExtra("alarm_id", alarm.id)
         }
 
         val pendingIntent = PendingIntent.getBroadcast(
             context,
-            requestCode,
+            alarm.id,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        Log.d("AlarmDebug", "Scheduling alarm ID=${alarm.id}")
+        Log.d("AlarmDebug", " Time: ${formatTime(alarm.startTime)} (${alarm.startTime})")
+        Log.d("AlarmDebug", " Location: ${alarm.cityName} (${alarm.lat}, ${alarm.lon})")
+        Log.d("AlarmDebug", " Trigger: ${alarm.triggerType}, ConditionType=${alarm.conditionType}, Condition=${alarm.condition}, Threshold=${alarm.thresholdValue}")
+
         alarmManager.setExactAndAllowWhileIdle(
             AlarmManager.RTC_WAKEUP,
-            alarmTime,
+            alarm.startTime,
             pendingIntent
         )
+    }
 
-        Log.d("AlarmScheduler", "Alarm scheduled at: $alarmTime with ID: $alarmId")
+    fun cancelAlarm(context: Context, alarmId: Int) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+        val intent = Intent(context, AlarmReceiver::class.java)
+
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            alarmId,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        alarmManager.cancel(pendingIntent)
+        Log.d("AlarmDebug", "❌ Canceled alarm with ID=$alarmId")
+    }
+
+    @SuppressLint("ScheduleExactAlarm")
+    fun scheduleSnoozedAlarm(context: Context, snoozeTime: Long) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            putExtra("alarm_id", Int.MAX_VALUE)
+        }
+
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            Int.MAX_VALUE,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        Log.d("AlarmDebug", " Snoozed alarm scheduled for ${formatTime(snoozeTime)}")
+
+        alarmManager.setExactAndAllowWhileIdle(
+            AlarmManager.RTC_WAKEUP,
+            snoozeTime,
+            pendingIntent
+        )
     }
 }

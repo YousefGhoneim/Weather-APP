@@ -1,4 +1,3 @@
-// SettingsScreen.kt (Final fix: handle permanently denied location permission)
 package com.example.weathery.setting
 
 import android.content.Intent
@@ -17,8 +16,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.airbnb.lottie.compose.*
 import com.example.weathery.R
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
@@ -28,10 +25,10 @@ import com.example.weathery.utils.LocationHandler
 
 @Composable
 fun SettingsScreen(
+    viewModel: SettingsViewModel,
     onRequestMapPicker: () -> Unit
 ) {
     val context = LocalContext.current
-    val viewModel = remember { SettingsViewModel(context) }
     val handler = remember { LocationHandler(context as ComponentActivity) }
 
     val language by viewModel.language.collectAsState()
@@ -64,7 +61,7 @@ fun SettingsScreen(
                             (context as? ComponentActivity)?.recreate()
                         }
                     )
-                    Text(stringResource(R.string.device_language))
+                    Text(stringResource(R.string.device_default))
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(
@@ -89,7 +86,7 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(16.dp))
-            Text(stringResource(R.string.measurement_system))
+            Text(stringResource(R.string.measurement_units))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 RadioButton(

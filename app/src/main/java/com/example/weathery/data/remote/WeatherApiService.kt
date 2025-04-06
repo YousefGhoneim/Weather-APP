@@ -9,7 +9,7 @@ interface WeatherApiService {
     suspend fun getWeather(
         @Query("lat") lat: Double,
         @Query("lon") lon: Double,
-        @Query("appid") apiKey: String = "30a73a92f374a05cbcd5f6b8caeacab0",
+        @Query("appid") apiKey: String = "02f7303416defaa054fd9589e2bd7ce2",
         @Query("units") units: String = "metric",
         @Query("lang") lang: String = "en"
     ): OneResponse

@@ -53,18 +53,14 @@ import kotlinx.coroutines.delay
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun HomeScreen(
-    viewModel: WeatherViewModel,
-    favViewModel: FavoritesViewModel = viewModel(factory = FavoritesViewModel.FavoritesViewModelFactory(
-        WeatherRepository(
-            WeatherRemoteDataSource(RetrofitHelper.service),
-            WeatherLocalDataSource(WeatherDatabase.getInstance(LocalContext.current).weatherDao())
-        )
-    )),
-    navigateToMap: () -> Unit = {}
+    homeViewModel: HomeViewModel,
+    settingsViewModel: SettingsViewModel,
+    favViewModel: FavoritesViewModel,
+    isConnected: Boolean,
+    navigateToMap: () -> Unit
 ) {
     val context = LocalContext.current
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val settingsViewModel = remember { SettingsViewModel(context) }
+    val uiState by homeViewModel.uiState.collectAsStateWithLifecycle()
 
     val unitSystem by settingsViewModel.unitSystem.collectAsState()
     val tempUnit by settingsViewModel.tempUnit.collectAsState()
@@ -79,13 +75,11 @@ fun HomeScreen(
     val fusedLocationClient = remember { com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context) }
 
     LaunchedEffect(locationSource, permissionState.status) {
-        Log.d("DEBUG_HOME", "Compose Permission Triggered: Source = $locationSource, Granted = ${permissionState.status.isGranted}")
-
         if (locationSource == "gps") {
             if (!permissionState.status.isGranted) {
                 if (permissionState.status.shouldShowRationale) {
                     Toast.makeText(context,
-                        context.getString(R.string.permission_denied_switching_to_map), Toast.LENGTH_SHORT).show()
+                        context.getString(R.string.permission_is_required_to_access_location), Toast.LENGTH_SHORT).show()
                     settingsViewModel.setLocationSource("map")
                     triggerMapNavigation = true
                 } else {
@@ -94,32 +88,27 @@ fun HomeScreen(
                 return@LaunchedEffect
             }
 
-            try {
-                fusedLocationClient.lastLocation.addOnSuccessListener { loc: Location? ->
-                    if (loc != null) {
-                        location = loc
-                        val geocoder = android.location.Geocoder(context)
-                        val addresses = geocoder.getFromLocation(loc.latitude, loc.longitude, 1)
-                        val city = addresses?.firstOrNull()?.locality ?: context.getString(R.string.unknown)
-                        val admin = addresses?.firstOrNull()?.adminArea ?: ""
-                        val country = addresses?.firstOrNull()?.countryName ?: ""
-                        cityName = listOfNotNull(city, admin, country).filter { it.isNotBlank() }.joinToString(", ")
-                    } else {
-                        Toast.makeText(context,
-                            context.getString(R.string.unable_to_get_location), Toast.LENGTH_SHORT).show()
-                        settingsViewModel.setLocationSource("map")
-                        triggerMapNavigation = true
-                    }
+            fusedLocationClient.lastLocation.addOnSuccessListener { loc: Location? ->
+                if (loc != null) {
+                    location = loc
+                    val geocoder = android.location.Geocoder(context)
+                    val addresses = geocoder.getFromLocation(loc.latitude, loc.longitude, 1)
+                    val city = addresses?.firstOrNull()?.locality ?: "Unknown"
+                    val admin = addresses?.firstOrNull()?.adminArea ?: ""
+                    val country = addresses?.firstOrNull()?.countryName ?: ""
+                    cityName = listOfNotNull(city, admin, country).filter { it.isNotBlank() }.joinToString(", ")
+                } else {
+                    Toast.makeText(context,
+                        context.getString(R.string.unable_to_get_location), Toast.LENGTH_SHORT).show()
+                    settingsViewModel.setLocationSource("map")
+                    triggerMapNavigation = true
                 }
-            } catch (e: SecurityException) {
-                Toast.makeText(context,
-                    context.getString(R.string.permission_error, e.localizedMessage), Toast.LENGTH_SHORT).show()
             }
         } else if (locationSource == "map") {
             val picked = settingsViewModel.getPickedLocation()
             if (picked != null) {
                 val (lat, lon, city) = picked
-                viewModel.fetchWeather(lat, lon, city, unitSystem)
+                homeViewModel.fetchWeather(lat, lon, city)
             } else {
                 Toast.makeText(context,
                     context.getString(R.string.please_pick_a_location_from_map), Toast.LENGTH_SHORT).show()
@@ -135,22 +124,28 @@ fun HomeScreen(
 
     LaunchedEffect(location) {
         location?.let { newLocation ->
-            val isNew = lastFetchedLocation == null ||
-                    newLocation.distanceTo(lastFetchedLocation!!) > 100
-
+            val isNew = lastFetchedLocation == null || newLocation.distanceTo(lastFetchedLocation!!) > 100
             if (isNew) {
-                viewModel.fetchWeather(newLocation.latitude, newLocation.longitude, cityName, unitSystem)
+                homeViewModel.fetchWeather(newLocation.latitude, newLocation.longitude, cityName)
                 lastFetchedLocation = newLocation
             }
         }
     }
 
-    when (state) {
+    LaunchedEffect(uiState) {
+        if (uiState is UiState.Success && !isConnected) {
+            Toast.makeText(context,
+                context.getString(R.string.showing_cached_weather_data), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    when (uiState) {
         is UiState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) {
             CircularProgressIndicator()
         }
+
         is UiState.Success -> {
-            val data = (state as UiState.Success).data
+            val data = (uiState as UiState.Success).data
             Box(Modifier.fillMaxSize()) {
                 WeatherLottieBackground(data.current.main)
                 Box(
@@ -178,7 +173,7 @@ fun HomeScreen(
                     Spacer(Modifier.height(16.dp))
                     ExtraMetricsSection(data.extra)
                     Spacer(Modifier.height(16.dp))
-                    Text("Hourly Details", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.hourly_details), style = MaterialTheme.typography.titleMedium)
                     HourlyForecastSection(data.hourly, tempUnit, data.extra.windUnit)
                     Spacer(Modifier.height(16.dp))
                     DailyForecastSection(data.daily, tempUnit, data.extra.windUnit)
@@ -187,10 +182,18 @@ fun HomeScreen(
                 }
             }
         }
-        is UiState.Error -> Text(stringResource(R.string.error, (state as UiState.Error).message))
-        is UiState.Empty -> Text(stringResource(R.string.no_data_available))
+
+        is UiState.Error -> {
+            val error = (uiState as UiState.Error).message
+            Text(text = stringResource(R.string.error, error), style = MaterialTheme.typography.bodyMedium, color = Color.Red)
+        }
+
+        is UiState.Empty -> {
+            Text(text = stringResource(R.string.no_data_available), style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }
+
 
 
 @Composable
@@ -227,7 +230,7 @@ fun CurrentWeatherSection(
             ) {
                 Icon(
                     imageVector = Icons.Default.Favorite,
-                    contentDescription = stringResource(R.string.add_to_favorites),
+                    contentDescription = "Add to favorites",
                     tint = Color.Red
                 )
             }
@@ -251,36 +254,15 @@ fun CurrentWeatherSection(
             horizontalArrangement = Arrangement.Center,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(stringResource(R.string.sunset, weather.sunset))
+            Text(text = stringResource(R.string.sunset, weather.sunset), style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.width(16.dp))
-            Text(stringResource(R.string.sunrise, weather.sunrise))
+            Text(text = stringResource(R.string.sunrise, weather.sunrise), style = MaterialTheme.typography.bodyMedium)
+
         }
     }
 }
 
-@Composable
-fun ExtraMetricsSection(metrics: ExtraMetricsUiModel) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly
-    ) {
-        MetricItem("Pressure", "${metrics.pressure} hPa")
-        MetricItem("Wind", "${metrics.windSpeed} ${metrics.windUnit}")
-        MetricItem("Humidity", "${metrics.humidity}%")
-        MetricItem("UV", "${metrics.uvi}")
-        MetricItem("Clouds", "${metrics.clouds}%")
-    }
-}
 
-@Composable
-fun MetricItem(title: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = title, style = MaterialTheme.typography.labelSmall)
-        Text(text = value, style = MaterialTheme.typography.bodyMedium)
-    }
-}
 
 @Composable
 fun HourlyForecastSection(hourlyList: List<HourlyWeatherUiModel>, tempUnitLabel: String, windUnit: String) {
@@ -336,7 +318,7 @@ fun DailyForecastSection(dailyList: List<DailyWeatherUiModel>, tempUnitLabel: St
         else -> "K"
     }
     Column {
-        Text("Next 7 Days", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.next_7_days), style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.height(8.dp))
 
         dailyList.forEach { day ->
@@ -381,14 +363,38 @@ fun DailyForecastSection(dailyList: List<DailyWeatherUiModel>, tempUnitLabel: St
                         modifier = Modifier.weight(1f),
                         horizontalAlignment = Alignment.End
                     ) {
-                        Text("🌡️ Max: ${day.maxTemp}$tempUnitLabel", style = MaterialTheme.typography.bodyMedium)
-                        Text("Min: ${day.minTemp}$tempUnitLabel", style = MaterialTheme.typography.labelSmall)
-                        Text("Feels like: ${day.feelsLike}$tempUnitLabel", style = MaterialTheme.typography.labelSmall)
+                        Text(stringResource(R.string.max, day.maxTemp, tempUnitLabel), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.min, day.minTemp, tempUnitLabel), style = MaterialTheme.typography.labelSmall)
+                        Text(stringResource(R.string.feels_like, day.feelsLike, tempUnitLabel), style = MaterialTheme.typography.labelSmall)
                         Text("🌀 ${day.windSpeed} $windUnit", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+fun ExtraMetricsSection(metrics: ExtraMetricsUiModel) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        MetricItem(stringResource(R.string.pressure), "${metrics.pressure} hPa")
+        MetricItem(stringResource(R.string.wind), "${metrics.windSpeed} ${metrics.windUnit}")
+        MetricItem(stringResource(R.string.humidity), "${metrics.humidity}%")
+        MetricItem(stringResource(R.string.uv), "${metrics.uvi}")
+        MetricItem(stringResource(R.string.clouds), "${metrics.clouds}%")
+    }
+}
+
+@Composable
+fun MetricItem(title: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = title, style = MaterialTheme.typography.labelSmall)
+        Text(text = value, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -449,7 +455,7 @@ fun BottomMetricsSection(metrics: ExtraMetricsUiModel) {
             .padding(bottom = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Environment Metrics", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.environment_metrics), style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(12.dp))
         LazyRow(
             contentPadding = PaddingValues(horizontal = 12.dp),
@@ -457,16 +463,16 @@ fun BottomMetricsSection(metrics: ExtraMetricsUiModel) {
             modifier = Modifier.fillMaxWidth()
         ) {
             item {
-                MetricArcCard("Pressure", metrics.pressure.toFloat(), 1100f, "hPa", Color(0xFFfc466b))
+                MetricArcCard(stringResource(R.string.pressuree), metrics.pressure.toFloat(), 1100f, "hPa", Color(0xFFfc466b))
             }
             item {
-                MetricArcCard("Humidity", metrics.humidity.toFloat(), 100f, "%", Color(0xFF1c92d2))
+                MetricArcCard(stringResource(R.string.humidityy), metrics.humidity.toFloat(), 100f, "%", Color(0xFF1c92d2))
             }
             item {
-                MetricArcCard("Wind", metrics.windSpeed.toFloat(), 30f, metrics.windUnit, Color(0xFF36d1dc))
+                MetricArcCard(stringResource(R.string.windd), metrics.windSpeed.toFloat(), 30f, metrics.windUnit, Color(0xFF36d1dc))
             }
             item {
-                MetricArcCard("UV", metrics.uvi.toFloat(), 11f, "", Color(0xFFf7971e))
+                MetricArcCard(stringResource(R.string.uvv), metrics.uvi.toFloat(), 11f, "", Color(0xFFf7971e))
             }
         }
 

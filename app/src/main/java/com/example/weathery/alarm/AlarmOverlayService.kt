@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.weathery.R
 import com.example.weathery.ui.theme.WeatheryTheme
@@ -30,9 +31,9 @@ class AlarmOverlayActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         // Retrieve the data passed from the AlarmReceiver
-        weatherCondition = intent.getStringExtra("weather_condition") ?: "Unknown"
-        country = intent.getStringExtra("country") ?: "Unknown"
-        temperature = intent.getStringExtra("temperature") ?: "--"
+        weatherCondition = intent.getStringExtra(getString(R.string.weather_conditionn)) ?: "Unknown"
+        country = intent.getStringExtra(getString(R.string.country)) ?: "Unknown"
+        temperature = intent.getStringExtra(getString(R.string.temperature)) ?: "--"
 
         // Set the window type and flags for overlay
         window.setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
@@ -42,7 +43,7 @@ class AlarmOverlayActivity : ComponentActivity() {
         )
 
         // Play custom alarm sound from raw folder
-        mediaPlayer = MediaPlayer.create(this, R.raw.alarm_sound) // Replace with your raw resource name
+        mediaPlayer = MediaPlayer.create(this, R.raw.alarm_sound)
         mediaPlayer?.isLooping = true
         mediaPlayer?.start()
 
@@ -59,7 +60,10 @@ class AlarmOverlayActivity : ComponentActivity() {
                             .fillMaxWidth()
                             .background(
                                 brush = Brush.verticalGradient(
-                                    colors = listOf(Color(0xFF192644), Color(0xFF112A59)) // Dark gradient background
+                                    colors = listOf(
+                                        Color(0xFF192644),
+                                        Color(0xFF112A59)
+                                    ) // Dark gradient background
                                 ),
                                 shape = RoundedCornerShape(12.dp)
                             ),
@@ -70,24 +74,24 @@ class AlarmOverlayActivity : ComponentActivity() {
                                 .padding(16.dp)
                                 .fillMaxWidth()
                         ) {
-                            Text("ALARM", style = MaterialTheme.typography.headlineLarge, color = Color.White)
+                            Text(stringResource(R.string.alarm), style = MaterialTheme.typography.headlineLarge, color = Color.White)
 
                             // Display actual Weather Condition and Country
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Weather: $weatherCondition",
+                                text = stringResource(R.string.weather, weatherCondition),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = Color.White
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Country: $country",
+                                text = stringResource(R.string.countryy, country),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = Color.White
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Temperature: $temperature°C",
+                                text = stringResource(R.string.temperature_c, temperature),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = Color.White
                             )
@@ -113,7 +117,7 @@ class AlarmOverlayActivity : ComponentActivity() {
                                     ),
                                     modifier = Modifier.weight(1f) // Equal width
                                 ) {
-                                    Text("Snooze", color = Color.White)
+                                    Text(stringResource(R.string.snooze), color = Color.White)
                                 }
 
                                 // Dismiss Button
@@ -128,7 +132,7 @@ class AlarmOverlayActivity : ComponentActivity() {
                                     ),
                                     modifier = Modifier.weight(1f) // Equal width
                                 ) {
-                                    Text("Dismiss", color = Color.White)
+                                    Text(stringResource(R.string.dismiss), color = Color.White)
                                 }
                             }
                         }
@@ -159,11 +163,10 @@ class AlarmOverlayActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // Similarly, check in onDestroy if mediaPlayer is not null and release it safely
         if (mediaPlayer != null) {
             mediaPlayer?.stop()
             mediaPlayer?.release()
-            mediaPlayer = null // Nullify the player after releasing
+            mediaPlayer = null
         }
     }
 

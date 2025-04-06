@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     id("com.google.devtools.ksp")
 
+
 }
 
 android {
@@ -53,6 +54,7 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.media3.common.ktx)
     implementation(libs.androidx.storage)
+    implementation(libs.core.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -109,6 +111,32 @@ dependencies {
     implementation ("androidx.savedstate:savedstate:1.2.1")
     implementation("androidx.compose.runtime:runtime:1.7.8")
     implementation ("com.google.accompanist:accompanist-permissions:0.31.5-beta")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    testImplementation("androidx.arch.core:core-testing:2.2.0")
+    testImplementation("com.google.truth:truth:1.1.3") // Optional - nicer assertions
+    testImplementation("io.mockk:mockk:1.13.17") // Mocking library
+
+    // ----------------------------------------
+    //  Android Instrumented Testing
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test:core:1.6.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+
+    // Room instrumentation test support
+    androidTestImplementation("androidx.room:room-testing:2.6.1")
+
+    // ----------------------------------------
+    //  Compose UI Testing (only if you're using Jetpack Compose)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.7.8")
+    debugImplementation("androidx.compose.ui:ui-test-manifest:1.7.8")
+
+    // ----------------------------------------
+    //  Hilt Testing (only if using Hilt - remove if not needed)
+    androidTestImplementation("com.google.dagger:hilt-android-testing:2.48")
+
 
 
 

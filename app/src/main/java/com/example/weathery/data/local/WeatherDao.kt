@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface WeatherDao {
 
-    // 🔹 Favorites
+    //  Favorites
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCity(city: CityEntity): Long
 
@@ -20,7 +20,7 @@ interface WeatherDao {
     @Delete
     suspend fun deleteCity(city: CityEntity): Int
 
-    // 🔹 Alarms
+    //  Alarms
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAlarm(alarm: WeatherAlarmEntity): Long
 

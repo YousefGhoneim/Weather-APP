@@ -44,7 +44,6 @@ import com.example.weathery.home.DailyForecastSection
 import com.example.weathery.home.ExtraMetricsSection
 import com.example.weathery.home.HourlyForecastSection
 import com.example.weathery.home.WeatherLottieBackground
-import com.example.weathery.home.WeatherViewModel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,8 +51,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
 import com.example.weathery.data.models.ExtraMetricsUiModel
 import com.example.weathery.home.BottomMetricsSection
+import com.example.weathery.home.HomeViewModel
 import com.example.weathery.setting.SettingsViewModel
 
 
@@ -63,17 +64,17 @@ fun PreviewWeatherScreen(
     lat: Double,
     lon: Double,
     city: String,
-    viewModel: WeatherViewModel,
+    weatherViewModel: HomeViewModel,
     favViewModel: FavoritesViewModel,
+    settingsViewModel: SettingsViewModel,
     onBack: () -> Unit
 ) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val state by weatherViewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var isFavorite by remember { mutableStateOf(false) }
     var resolvedCityName by remember { mutableStateOf(city) }
     val favoritesState by favViewModel.favoritesState.collectAsStateWithLifecycle()
 
-    val settingsViewModel = remember { SettingsViewModel(context) }
     val unitSystem by settingsViewModel.unitSystem.collectAsState()
     val tempUnit by settingsViewModel.tempUnit.collectAsState()
 
@@ -86,7 +87,7 @@ fun PreviewWeatherScreen(
             address?.countryName
         ).filter { it.isNotBlank() }.joinToString(", ")
 
-        viewModel.fetchWeather(lat, lon, resolvedCityName, unitSystem)
+        weatherViewModel.fetchWeather(lat, lon, resolvedCityName)
     }
 
     LaunchedEffect(favoritesState) {
@@ -99,7 +100,7 @@ fun PreviewWeatherScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Weather in $resolvedCityName") },
+                title = { Text(stringResource(R.string.weather_in, resolvedCityName)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -110,7 +111,8 @@ fun PreviewWeatherScreen(
                         IconButton(onClick = {
                             val cityEntity = CityEntity(name = resolvedCityName, lat = lat, lon = lon)
                             favViewModel.saveCity(cityEntity)
-                            Toast.makeText(context, "Added to favorites", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context,
+                                context.getString(R.string.added_to_favoritess), Toast.LENGTH_SHORT).show()
                         }) {
                             Icon(
                                 imageVector = Icons.Default.FavoriteBorder,
@@ -169,8 +171,12 @@ fun PreviewWeatherScreen(
                 }
             }
 
-            is UiState.Error -> Text("Error: ${(state as UiState.Error).message}")
-            is UiState.Empty -> Text("No data available.")
+            is UiState.Error -> Text(
+                stringResource(
+                    R.string.errorr,
+                    (state as UiState.Error).message
+                ))
+            is UiState.Empty -> Text(stringResource(R.string.no_data_availablee))
         }
     }
 }

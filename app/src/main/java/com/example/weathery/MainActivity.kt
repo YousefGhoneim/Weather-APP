@@ -2,16 +2,21 @@ package com.example.weathery
 
 import android.content.Context
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.example.weathery.ui.theme.WeatheryTheme
 import com.example.weathery.utils.LanguageUtils
 import com.example.weathery.utils.LocationHandler
 import kotlinx.coroutines.delay
-import java.util.Locale
+import java.util.*
 
 class MainActivity : ComponentActivity() {
 
@@ -20,7 +25,7 @@ class MainActivity : ComponentActivity() {
     override fun attachBaseContext(newBase: Context) {
         val prefs = newBase.getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
         val lang = prefs.getString("language", "device") ?: "device"
-        val languageCode = if (lang == "device") java.util.Locale.getDefault().language else lang
+        val languageCode = if (lang == "device") Locale.getDefault().language else lang
         val wrapped = LanguageUtils.wrap(newBase, languageCode)
         super.attachBaseContext(wrapped)
     }
@@ -31,7 +36,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         locationHandler = LocationHandler(this)
-
         if (!locationHandler.checkPermissions()) {
             locationHandler.requestPermissions()
         }
@@ -45,23 +49,35 @@ class MainActivity : ComponentActivity() {
                     delay(1000)
                     val prefs = getSharedPreferences("weathery_prefs", Context.MODE_PRIVATE)
                     showOnboarding = !prefs.getBoolean("onboarding_completed", false)
+                    Log.d("DEBUG_ONBOARD", "Show onboarding: $showOnboarding")
                     isLoading = false
                 }
 
                 splashScreen.setKeepOnScreenCondition { isLoading }
 
-                if (isLoading) return@WeatheryTheme
-
-                if (showOnboarding) {
-                    OnboardingScreen(
-                        onDone = {
-                            getSharedPreferences("weathery_prefs", Context.MODE_PRIVATE)
-                                .edit().putBoolean("onboarding_completed", true).apply()
-                            showOnboarding = false
-                        }
-                    )
-                } else {
-                    MainNavigation()
+                when {
+//                    isLoading -> {
+//                        Box(
+//                            modifier = Modifier.fillMaxSize(),
+//                            contentAlignment = Alignment.Center
+//                        ) {
+//                            CircularProgressIndicator()
+//                        }
+//                    }
+                    showOnboarding -> {
+                        OnboardingScreen(
+                            onDone = {
+                                getSharedPreferences("weathery_prefs", Context.MODE_PRIVATE)
+                                    .edit()
+                                    .putBoolean("onboarding_completed", true)
+                                    .apply()
+                                showOnboarding = false
+                            }
+                        )
+                    }
+                    else -> {
+                        MainNavigation()
+                    }
                 }
             }
         }

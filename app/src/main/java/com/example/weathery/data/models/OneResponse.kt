@@ -65,7 +65,7 @@ data class HourlyItem(
 
 data class MinutelyItem(
     val dt: Long? = null,
-    val precipitation: Int? = null
+    val precipitation: Double? = null
 )
 
 data class Current(

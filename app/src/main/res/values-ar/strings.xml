@@ -1,30 +1,83 @@
 <resources>
     <string name="app_name">ويذري</string>
     <string name="language">اللغة</string>
-    <string name="device_language">استخدم لغة الجهاز</string>
+    <string name="device_default">لغة الجهاز</string>
     <string name="english">الإنجليزية</string>
     <string name="arabic">العربية</string>
-    <string name="measurement_system">نظام القياس (الحرارة + الرياح)</string>
-    <string name="metric">متري (°م، م/ث)</string>
-    <string name="imperial">إنجليزي (°ف، ميل/س)</string>
-    <string name="standard">قياسي (كلفن، م/ث)</string>
+    <string name="measurement_units">وحدات القياس</string>
+    <string name="metric">متري</string>
+    <string name="imperial">إمبراطوري</string>
+    <string name="standard">قياسي</string>
     <string name="location_source">مصدر الموقع</string>
-    <string name="gps">GPS</string>
+    <string name="gps">نظام تحديد المواقع (GPS)</string>
     <string name="map_picker">اختيار من الخريطة</string>
+    <string name="permission_is_required_to_access_location">يتطلب إذنًا للوصول إلى الموقع</string>
+    <string name="unable_to_get_location">تعذر الحصول على الموقع</string>
+    <string name="please_pick_a_location_from_map">يرجى اختيار موقع من الخريطة</string>
+    <string name="showing_cached_weather_data">عرض بيانات الطقس المخزنة</string>
+    <string name="added_to_favorites">تمت الإضافة إلى المفضلة</string>
+    <string name="hourly_details">تفاصيل كل ساعة</string>
+    <string name="error">خطأ: %1$s</string>
+    <string name="no_data_available">لا توجد بيانات متاحة.</string>
+    <string name="sunset">غروب الشمس: %1$s</string>
+    <string name="sunrise">شروق الشمس: %1$s</string>
+    <string name="pressure">الضغط</string>
+    <string name="wind">الرياح</string>
+    <string name="humidity">الرطوبة</string>
+    <string name="uv">الأشعة فوق البنفسجية</string>
+    <string name="clouds">الغيوم</string>
+    <string name="next_7_days">السبعة أيام القادمة</string>
+    <string name="max">🌡️ أعلى: %1$s%2$s</string>
+    <string name="min">أدنى: %1$s%2$s</string>
+    <string name="feels_like">يشعر وكأنه: %1$s%2$s</string>
+    <string name="environment_metrics">مقاييس البيئة</string>
+    <string name="pressuree">الضغط</string>
+    <string name="humidityy">الرطوبة</string>
+    <string name="windd">الرياح</string>
+    <string name="uvv">الأشعة فوق البنفسجية</string>
+    <string name="removed">%1$s تمت إزالته</string>
+    <string name="undo">تراجع</string>
+    <string name="pick_location_to_add">اختر موقعًا للإضافة</string>
+    <string name="error_loading_favorites">خطأ في تحميل المفضلات</string>
+    <string name="no_favorite_cities_yet">لا توجد مدن مفضلة حتى الآن</string>
+    <string name="deleteiconscale">حجم أيقونة الحذف</string>
+    <string name="deleteiconrotate">دوران أيقونة الحذف</string>
     <string name="add_alarm">إضافة منبه</string>
-    <string name="save">حفظ</string>
-    <string name="cancel">إلغاء</string>
-    <string name="pick_location">اختر الموقع</string>
     <string name="change_location">تغيير الموقع</string>
-    <string name="start_time">وقت البدء</string>
-    <string name="end_time">وقت الانتهاء</string>
-    <string name="repeat_on_days">تكرار في الأيام</string>
+    <string name="pick_location">اختر الموقع</string>
+    <string name="selected_location">الموقع المحدد: %1$s</string>
+    <string name="start">البدء: %1$s</string>
+    <string name="end">الانتهاء: %1$s</string>
+    <string name="end_time_must_be_after_start_time">وقت الانتهاء يجب أن يكون بعد وقت البدء</string>
+    <string name="time_must_be_in_the_future">الوقت يجب أن يكون في المستقبل</string>
     <string name="condition_type">نوع الشرط</string>
+    <string name="none">لا شيء</string>
+    <string name="condition">الشرط</string>
+    <string name="threshold">العتبة</string>
     <string name="trigger_type">نوع التنبيه</string>
-    <string name="notification">إشعار</string>
+    <string name="alarm_scheduled">تم جدولة المنبه</string>
+    <string name="save_alarm">حفظ المنبه</string>
+    <string name="weather_condition">حالة الطقس</string>
+    <string name="weather_conditionn">حالة_الطقس</string>
+    <string name="country">الدولة</string>
+    <string name="temperature">درجة الحرارة</string>
     <string name="alarm">منبه</string>
-    <string name="confirm_location">تأكيد الموقع</string>
-    <string name="search_city">ابحث عن مدينة</string>
-    <string name="city">المدينة</string>
-    <string name="get_started">ابدأ</string>
+    <string name="weather">الطقس: %1$s</string>
+    <string name="countryy">الدولة: %1$s</string>
+    <string name="temperature_c">درجة الحرارة: %1$s°C</string>
+    <string name="snooze">غفوة</string>
+    <string name="dismiss">إغلاق</string>
+    <string name="removedd">%1$s تمت إزالته</string>
+    <string name="undoo">تراجع</string>
+    <string name="overlay_permission_required">يتطلب إذن التراكب</string>
+    <string name="to_display_alarms_over_other_apps_please_allow_overlay_permission_in_settings">لعرض المنبهات فوق التطبيقات الأخرى، يرجى السماح بإذن التراكب من الإعدادات.</string>
+    <string name="go_to_settings">اذهب إلى الإعدادات</string>
+    <string name="cancel">إلغاء</string>
+    <string name="add_alarmm">إضافة منبه</string>
+    <string name="time">الوقت: %1$s → %2$s</string>
+    <string name="conditionn">الشرط: %1$s</string>
+    <string name="weather_in">الطقس في %1$s</string>
+    <string name="added_to_favoritess">تمت الإضافة إلى المفضلة</string>
+    <string name="errorr">خطأ: %1$s</string>
+    <string name="no_data_availablee">لا توجد بيانات متاحة.</string>
 </resources>

@@ -39,59 +39,53 @@ import java.util.*
 @Composable
 fun AddAlarmScreen(
     selectedLocation: Triple<Double, Double, String>? = null,
-    existingAlarm: WeatherAlarmEntity? = null,
     onBack: () -> Unit,
     onPickLocationFromMap: () -> Unit,
-    onSave: (WeatherAlarmEntity) -> Unit,
     viewModel: AlarmsViewModel
 ) {
     val context = LocalContext.current
-    var showPermissionDialog by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            if (!alarmManager.canScheduleExactAlarms()) {
-                showPermissionDialog = true
-            }
-        }
-    }
-
-    // 🔔 Notification permission dialog for Android 13+
-    NotificationPermissionDialog(
-        context = context,
-        onDismiss = {},
-        onGranted = {
-            Log.d("NotificationPermission", "Granted from alarm screen")
-        },
-        onDenied = {
-            Toast.makeText(context, "Notification permission denied", Toast.LENGTH_SHORT).show()
-        }
-    )
+    val coroutineScope = rememberCoroutineScope()
 
     var city by remember { mutableStateOf("") }
     var lat by remember { mutableStateOf<Double?>(null) }
     var lon by remember { mutableStateOf<Double?>(null) }
 
-    var startTime by remember { mutableStateOf<Pair<Int, Int>?>(null) }
-    var endTime by remember { mutableStateOf<Pair<Int, Int>?>(null) }
-    var showStartPicker by remember { mutableStateOf(false) }
-    var showEndPicker by remember { mutableStateOf(false) }
-
-    val todayIndex = Calendar.getInstance().get(Calendar.DAY_OF_WEEK).let { (it + 5) % 7 } // Sunday = 0
-    val weekDays = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
-    var selectedDays by remember { mutableStateOf(setOf(todayIndex)) }
+    var startTimeMillis by remember { mutableStateOf<Long?>(null) }
+    var endTimeMillis by remember { mutableStateOf<Long?>(null) }
+    val startTimeLabel = remember { mutableStateOf("Pick Start Time") }
+    val endTimeLabel = remember { mutableStateOf("Pick End Time") }
 
     var conditionType by remember { mutableStateOf("") }
     var condition by remember { mutableStateOf("") }
     var threshold by remember { mutableStateOf("") }
 
-    var showErrors by remember { mutableStateOf(false) }
     var timeValidationError by remember { mutableStateOf(false) }
     var pastTimeError by remember { mutableStateOf(false) }
 
-    val conditionTypes = listOf("", "weather", "temp", "uvi")
-    val weatherOptions = listOf("Clear", "Clouds", "Rain", "Snow", "Thunderstorm", "Drizzle", "Mist")
+    var triggerType by remember { mutableStateOf("notification") }
+
+    fun showDateTimePicker(label: MutableState<String>, onPicked: (Long) -> Unit) {
+        val calendar = Calendar.getInstance()
+        android.app.DatePickerDialog(
+            context,
+            { _, y, m, d ->
+                calendar.set(Calendar.YEAR, y)
+                calendar.set(Calendar.MONTH, m)
+                calendar.set(Calendar.DAY_OF_MONTH, d)
+                TimePickerDialog(context, { _, h, min ->
+                    calendar.set(Calendar.HOUR_OF_DAY, h)
+                    calendar.set(Calendar.MINUTE, min)
+                    calendar.set(Calendar.SECOND, 0)
+                    calendar.set(Calendar.MILLISECOND, 0)
+                    onPicked(calendar.timeInMillis)
+                    label.value = "$d/${m + 1}/$y ${"%02d:%02d".format(h, min)}"
+                }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), false).show()
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
 
     LaunchedEffect(selectedLocation) {
         selectedLocation?.let {
@@ -104,272 +98,106 @@ fun AddAlarmScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         AlarmAddedLottieBackground("clear")
 
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            contentAlignment = Alignment.TopCenter
+                .verticalScroll(rememberScrollState())
         ) {
-            Card(
-                modifier = Modifier
-                    .padding(top = 50.dp)
-                    .fillMaxWidth(0.9f)
-                    .height(420.dp)
-                    .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.Transparent)
-            ) {
-                val coroutineScope = rememberCoroutineScope()
+            Text(stringResource(R.string.add_alarm), style = MaterialTheme.typography.headlineSmall)
+            Spacer(Modifier.height(12.dp))
 
-                //Expired alarm cleanup every minute
-                DisposableEffect(Unit) {
-                    val handler = Handler(Looper.getMainLooper())
-                    val checkRunnable = object : Runnable {
-                        override fun run() {
-                            viewModel.cleanExpiredAlarms()
-                            handler.postDelayed(this, 60_000L)
-                        }
-                    }
-                    handler.post(checkRunnable)
-                    onDispose { handler.removeCallbacks(checkRunnable) }
-                }
+            Button(onClick = onPickLocationFromMap, modifier = Modifier.fillMaxWidth()) {
+                Text(if (city.isNotEmpty()) stringResource(R.string.change_location) else stringResource(
+                    R.string.pick_location
+                )
+                )
+            }
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(12.dp)
-                ) {
-                    Text(stringResource(R.string.add_alarm), style = MaterialTheme.typography.titleLarge)
-                    Spacer(Modifier.height(8.dp))
-
-                    Text(
-                        stringResource(
-                            R.string.picked_location,
-                            city.ifEmpty { "None" }
-                        ))
-                    if (showErrors && (lat == null || lon == null)) {
-                        Text(stringResource(R.string.please_select_a_location), color = Color.Red)
-                    }
-
-                    Button(onClick = onPickLocationFromMap, modifier = Modifier.fillMaxWidth()) {
-                        Text(if (city.isNotEmpty()) "Change Location" else "Pick Location")
-                    }
-
-                    Spacer(Modifier.height(8.dp))
-                    Button(onClick = { showStartPicker = true }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Start Time: ${startTime?.formatTime() ?: "--:--"}")
-                    }
-                    Button(onClick = { showEndPicker = true }, modifier = Modifier.fillMaxWidth()) {
-                        Text("End Time: ${endTime?.formatTime() ?: "--:--"}")
-                    }
-                    if (showErrors && (startTime == null || endTime == null)) {
-                        Text("Please select both start and end time", color = Color.Red)
-                    }
-                    if (timeValidationError) {
-                        Text("End time must be after start time", color = Color.Red)
-                    }
-                    if (pastTimeError) {
-                        Text("Selected time must be in the future", color = Color.Red)
-                    }
-
-                    Spacer(Modifier.height(8.dp))
-                    Text("Repeat on Days:")
-                    Column {
-                        weekDays.forEachIndexed { index, day ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .toggleable(
-                                        value = index in selectedDays,
-                                        onValueChange = {
-                                            selectedDays = selectedDays.toMutableSet().apply {
-                                                if (contains(index)) remove(index) else add(index)
-                                            }
-                                        }
-                                    )
-                                    .padding(start = 4.dp)
-                            ) {
-                                Checkbox(checked = index in selectedDays, onCheckedChange = null)
-                                Text(day)
-                            }
-                        }
-                    }
-                    if (showErrors && selectedDays.isEmpty()) {
-                        Text("Select at least one day", color = Color.Red)
-                    }
-
-                    Spacer(Modifier.height(8.dp))
-                    Text("Condition Type")
-                    conditionTypes.forEach {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = conditionType == it,
-                                onClick = { conditionType = it; condition = ""; threshold = "" }
-                            )
-                            Text(it.ifEmpty { "None" })
-                        }
-                    }
-
-                    if (conditionType == "weather") {
-                        DropdownMenuContent(weatherOptions, condition) { condition = it }
-                    }
-
-                    if (conditionType == "temp" || conditionType == "uvi") {
-                        OutlinedTextField(
-                            value = threshold,
-                            onValueChange = { threshold = it },
-                            label = { Text("Threshold Value") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    Spacer(Modifier.height(8.dp))
-                    var triggerType by remember { mutableStateOf("notification") }
-                    val triggerOptions = listOf("notification", "alarm")
-                    Text("Trigger Type")
-                    triggerOptions.forEach {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = triggerType == it, onClick = { triggerType = it })
-                            Text(it.replaceFirstChar { c -> c.uppercaseChar() })
-                        }
-                    }
-
-                    Spacer(Modifier.height(12.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        TextButton(onClick = onBack) { Text("Cancel") }
-                        Button(
-                            onClick = {
-                                showErrors = true
-                                timeValidationError = false
-                                pastTimeError = false
-
-                                if (lat != null && lon != null && startTime != null && endTime != null && selectedDays.isNotEmpty()) {
-                                    val now = Calendar.getInstance()
-                                    val todayIndex = (now.get(Calendar.DAY_OF_WEEK) + 5) % 7
-                                    val startTotalMinutes = startTime!!.first * 60 + startTime!!.second
-                                    val endTotalMinutes = endTime!!.first * 60 + endTime!!.second
-
-                                    if (endTotalMinutes <= startTotalMinutes) {
-                                        timeValidationError = true
-                                        return@Button
-                                    }
-
-                                    selectedDays.forEach { dayIndex ->
-                                        val cal = Calendar.getInstance().apply {
-                                            set(Calendar.DAY_OF_WEEK, (dayIndex + 1) % 7 + 1)
-                                            set(Calendar.HOUR_OF_DAY, startTime!!.first)
-                                            set(Calendar.MINUTE, startTime!!.second)
-                                            set(Calendar.SECOND, 0)
-                                            set(Calendar.MILLISECOND, 0)
-                                        }
-
-                                        if (dayIndex == todayIndex && cal.before(now)) {
-                                            pastTimeError = true
-                                            return@Button
-                                        }
-
-                                        if (cal.timeInMillis <= System.currentTimeMillis()) {
-                                            cal.add(Calendar.WEEK_OF_YEAR, 1)
-                                        }
-
-                                        val calEnd = Calendar.getInstance().apply {
-                                            timeInMillis = cal.timeInMillis
-                                            set(Calendar.HOUR_OF_DAY, endTime!!.first)
-                                            set(Calendar.MINUTE, endTime!!.second)
-                                        }
-
-                                        if (triggerType == "alarm" && !Settings.canDrawOverlays(context)) {
-                                            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
-                                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                            }
-                                            context.startActivity(intent)
-                                            Toast.makeText(context, "Please grant 'Draw over other apps' permission", Toast.LENGTH_LONG).show()
-                                            return@Button
-                                        }
-
-                                        val alarm = WeatherAlarmEntity(
-                                            cityName = city,
-                                            lat = lat!!,
-                                            lon = lon!!,
-                                            startTime = cal.timeInMillis,
-                                            endTime = calEnd.timeInMillis,
-                                            conditionType = conditionType,
-                                            condition = condition,
-                                            thresholdValue = threshold.toDoubleOrNull(),
-                                            triggerType = triggerType
-                                        )
-
-                                        coroutineScope.launch {
-                                            val alarmId = viewModel.saveAndReturnId(alarm)
-                                            viewModel.scheduleAlarm(
-                                                context = context,
-                                                alarmTime = cal.timeInMillis,
-                                                requestCode = (System.currentTimeMillis() % Int.MAX_VALUE).toInt(),
-                                                alarmId = alarmId
-                                            )
-                                            Toast.makeText(context, "Alarms scheduled", Toast.LENGTH_SHORT).show()
-                                            onBack()
-                                        }
-                                    }
-
-                                    Toast.makeText(context, "Alarms scheduled", Toast.LENGTH_SHORT).show()
-                                    onBack()
-                                }
-                            },
-                            enabled = startTime != null && endTime != null
-                        ) {
-                            Text("Save")
-                        }
-                    }
-                }
+            Spacer(Modifier.height(12.dp))
+            if (city.isNotEmpty()) {
+                Text(stringResource(R.string.selected_location, city), style = MaterialTheme.typography.bodyLarge)
             }
 
 
+            Button(onClick = { showDateTimePicker(startTimeLabel) { startTimeMillis = it } }, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.start, startTimeLabel.value))
+            }
+            Button(onClick = { showDateTimePicker(endTimeLabel) { endTimeMillis = it } }, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.end, endTimeLabel.value))
+            }
 
+            if (timeValidationError) Text(stringResource(R.string.end_time_must_be_after_start_time), color = MaterialTheme.colorScheme.error)
+            if (pastTimeError) Text(stringResource(R.string.time_must_be_in_the_future), color = MaterialTheme.colorScheme.error)
 
+            Spacer(Modifier.height(12.dp))
+
+            Text(stringResource(R.string.condition_type))
+            listOf("", "weather", "temp", "uvi").forEach { type ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = conditionType == type, onClick = { conditionType = type })
+                    Text(type.ifEmpty { stringResource(R.string.none) })
+                }
+            }
+
+            if (conditionType == "weather") {
+                OutlinedTextField(value = condition, onValueChange = { condition = it }, label = { Text(
+                    stringResource(R.string.condition)
+                ) })
+            }
+
+            if (conditionType == "temp" || conditionType == "uvi") {
+                OutlinedTextField(value = threshold, onValueChange = { threshold = it }, label = { Text(
+                    stringResource(R.string.threshold)
+                ) })
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Text(stringResource(R.string.trigger_type))
+            listOf("notification", "alarm").forEach { type ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = triggerType == type, onClick = { triggerType = type })
+                    Text(type.replaceFirstChar { it.uppercaseChar() })
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            Button(onClick = {
+                val now = System.currentTimeMillis()
+                if (startTimeMillis == null || endTimeMillis == null || startTimeMillis!! <= now || endTimeMillis!! <= startTimeMillis!!) {
+                    timeValidationError = endTimeMillis != null && endTimeMillis!! <= startTimeMillis!!
+                    pastTimeError = startTimeMillis != null && startTimeMillis!! <= now
+                    return@Button
+                }
+
+                val alarm = WeatherAlarmEntity(
+                    cityName = city,
+                    lat = lat!!,
+                    lon = lon!!,
+                    startTime = startTimeMillis!!,
+                    endTime = endTimeMillis!!,
+                    conditionType = conditionType,
+                    condition = condition,
+                    thresholdValue = threshold.toDoubleOrNull(),
+                    triggerType = triggerType
+                )
+
+                coroutineScope.launch {
+                    val id = viewModel.saveAndReturnId(alarm)
+                    AlarmScheduler.scheduleAlarm(context, alarm.copy(id = id))
+                    Toast.makeText(context,
+                        context.getString(R.string.alarm_scheduled), Toast.LENGTH_SHORT).show()
+                    onBack()
+                }
+            }, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.save_alarm))
+            }
         }
     }
-
-    if (showStartPicker) {
-        TimePickerDialog(context, { _, h, m ->
-            startTime = h to m
-            showStartPicker = false
-        }, 8, 0, true).show()
-    }
-    if (showEndPicker) {
-        TimePickerDialog(context, { _, h, m ->
-            endTime = h to m
-            showEndPicker = false
-        }, 10, 0, true).show()
-    }
-
-    if (showPermissionDialog) {
-        AlertDialog(
-            onDismissRequest = { showPermissionDialog = false },
-            title = { Text("Permission Required") },
-            text = { Text("Please allow exact alarm permission in settings.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    showPermissionDialog = false
-                    val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    }
-                    context.startActivity(intent)
-                }) {
-                    Text("Yes")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPermissionDialog = false }) {
-                    Text("No")
-                }
-            }
-        )
-    }
 }
+
 
 private fun Pair<Int, Int>.formatTime(): String = "%02d:%02d".format(first, second)
 
@@ -381,7 +209,7 @@ fun DropdownMenuContent(options: List<String>, selected: String, onSelected: (St
             value = selected,
             onValueChange = {},
             readOnly = true,
-            label = { Text("Weather Condition") },
+            label = { Text(stringResource(R.string.weather_condition)) },
             trailingIcon = {
                 IconButton(onClick = { expanded = true }) {
                     Icon(Icons.Default.ArrowDropDown, contentDescription = "Select")
